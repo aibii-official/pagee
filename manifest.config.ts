@@ -14,7 +14,8 @@ export default defineManifest({
     'https://api.deepseek.com/*',
     'https://api.moonshot.cn/*',
     'https://dashscope.aliyuncs.com/*',
-    'https://open.bigmodel.cn/*'
+    'https://open.bigmodel.cn/*',
+    'file:///*'
   ],
   action: {
     default_popup: 'src/ui/popup/index.html',

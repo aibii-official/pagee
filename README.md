@@ -14,7 +14,10 @@ Pagee is usable as a local development extension, but it is not a polished store
 
 - Summarize the active page from the popup or Chrome side panel.
 - Summarize selected text from the context menu.
+- Summarize PDFs from the side panel. Pagee first tries the PDF already open in Chrome, then falls back to choosing the file when Chrome blocks direct access.
+- Use vision-capable models for PDF page images, charts, screenshots, and scanned/image-only PDFs.
 - Use a side panel workspace that follows the active tab and SPA URL changes.
+- Track long summary jobs with visible extraction, chunking, model-call, synthesis, and save progress.
 - Save summaries, extracted content metadata, topics, entities, and versions in local IndexedDB.
 - Search local summary history from the Knowledge page.
 - Configure providers and API keys locally in the Options page.
@@ -46,6 +49,7 @@ Pagee uses an internal extractor plugin system:
 
 - `selection`: selected text, highest priority.
 - `declarative-rule`: built-in and user-provided JSON selector rules.
+- `pdf-file`: opened or user-selected PDF files parsed in the extension UI, with all PDF pages rendered for vision-capable models and summarized in batches when needed.
 - `generic-readability`: article extraction with Mozilla Readability.
 - `visible-text`: cleaned visible text fallback.
 
@@ -128,7 +132,8 @@ src/
 ## Current Limitations
 
 - This is a local development build, not a Chrome Web Store release.
-- PDF support is limited to selectable/browser-visible text behavior.
+- Local PDF direct reading depends on Chrome file URL access. If blocked, use the side panel file picker fallback.
+- Scanned/image-only PDFs require a vision-capable model. Pagee renders PDF pages as images and sends them in batches to models marked with vision support, then synthesizes the batch summaries.
 - Video subtitle extraction and Twitter/X thread extraction are not specialized yet.
 - There is no cloud sync, account system, or backend backup.
 - Knowledge graph and embedding search are scaffolded conceptually but not fully implemented.

@@ -1,5 +1,33 @@
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { ExtractionQuality, SummaryResult, UiLanguage } from '../../shared/types';
 import { t } from '../i18n';
+
+function MarkdownText({ children, inline = false }: { children: string; inline?: boolean }) {
+  return (
+    <ReactMarkdown
+      className={inline ? undefined : 'markdown-body'}
+      remarkPlugins={[remarkGfm]}
+      components={
+        inline
+          ? {
+              p: ({ children }) => <>{children}</>,
+              ul: ({ children }) => <>{children}</>,
+              ol: ({ children }) => <>{children}</>
+            }
+          : {
+              a: ({ href, children }) => (
+                <a href={href} rel="noreferrer" target="_blank">
+                  {children}
+                </a>
+              )
+            }
+      }
+    >
+      {children}
+    </ReactMarkdown>
+  );
+}
 
 export function QualityBadge({ quality }: { quality: ExtractionQuality }) {
   const className = quality.score >= 0.7 ? 'pill good' : quality.score >= 0.4 ? 'pill warn' : 'pill bad';
@@ -20,7 +48,7 @@ export function SummaryView({ summary, language = 'en' }: { summary: SummaryResu
             {t(language, 'confidence')} {summary.confidence}
           </span>
         </div>
-        <p>{summary.tldr}</p>
+        <MarkdownText>{summary.tldr}</MarkdownText>
       </div>
 
       {summary.bullets.length > 0 && (
@@ -28,7 +56,7 @@ export function SummaryView({ summary, language = 'en' }: { summary: SummaryResu
           <h3>{t(language, 'bullets')}</h3>
           <ul className="summary-list">
             {summary.bullets.map((bullet, index) => (
-              <li key={`${bullet}-${index}`}>{bullet}</li>
+              <li key={`${bullet}-${index}`}><MarkdownText inline>{bullet}</MarkdownText></li>
             ))}
           </ul>
         </div>
@@ -37,7 +65,7 @@ export function SummaryView({ summary, language = 'en' }: { summary: SummaryResu
       {summary.detailed && (
         <div className="card stack">
           <h3>{t(language, 'detailedSummary')}</h3>
-          <p>{summary.detailed}</p>
+          <MarkdownText>{summary.detailed}</MarkdownText>
         </div>
       )}
 
@@ -46,7 +74,7 @@ export function SummaryView({ summary, language = 'en' }: { summary: SummaryResu
           <h3>{t(language, 'claims')}</h3>
           <ul className="summary-list">
             {summary.keyClaims.map((claim, index) => (
-              <li key={`${claim}-${index}`}>{claim}</li>
+              <li key={`${claim}-${index}`}><MarkdownText inline>{claim}</MarkdownText></li>
             ))}
           </ul>
         </div>
@@ -58,8 +86,8 @@ export function SummaryView({ summary, language = 'en' }: { summary: SummaryResu
           <div className="quote-list">
             {summary.quotes.map((quote, index) => (
               <div className="quote" key={`${quote.text}-${index}`}>
-                <p>{quote.text}</p>
-                <p className="muted">{quote.sourceBlockId ? `${quote.sourceBlockId} · ` : ''}{quote.reason}</p>
+                <MarkdownText>{quote.text}</MarkdownText>
+                <div className="muted">{quote.sourceBlockId ? `${quote.sourceBlockId} · ` : ''}<MarkdownText inline>{quote.reason}</MarkdownText></div>
               </div>
             ))}
           </div>
@@ -79,7 +107,7 @@ export function SummaryView({ summary, language = 'en' }: { summary: SummaryResu
           <h3>{t(language, 'openQuestions')}</h3>
           <ul className="summary-list">
             {summary.openQuestions.map((question, index) => (
-              <li key={`${question}-${index}`}>{question}</li>
+              <li key={`${question}-${index}`}><MarkdownText inline>{question}</MarkdownText></li>
             ))}
           </ul>
         </div>
@@ -90,7 +118,7 @@ export function SummaryView({ summary, language = 'en' }: { summary: SummaryResu
           <h3>{t(language, 'actionItems')}</h3>
           <ul className="summary-list">
             {summary.actionItems.map((item, index) => (
-              <li key={`${item}-${index}`}>{item}</li>
+              <li key={`${item}-${index}`}><MarkdownText inline>{item}</MarkdownText></li>
             ))}
           </ul>
         </div>

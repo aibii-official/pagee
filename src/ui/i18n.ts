@@ -7,6 +7,7 @@ type MessageKey =
   | 'baseUrl'
   | 'bullets'
   | 'chatModel'
+  | 'choosePdf'
   | 'claims'
   | 'clearKnowledge'
   | 'confidence'
@@ -15,8 +16,10 @@ type MessageKey =
   | 'defaultProvider'
   | 'defaultProviderHint'
   | 'detailedSummary'
+  | 'directPdfReadFailed'
   | 'enabled'
   | 'enabledCount'
+  | 'extractingPdf'
   | 'extractorHint'
   | 'interfaceLanguage'
   | 'keyPlaceholder'
@@ -30,8 +33,11 @@ type MessageKey =
   | 'noEnabledProvider'
   | 'openKnowledge'
   | 'openQuestions'
+  | 'openWorkspaceToImportPdf'
   | 'openWorkspace'
   | 'options'
+  | 'pdfHint'
+  | 'pdfTarget'
   | 'privacy'
   | 'providerPermissionDenied'
   | 'providerSettings'
@@ -47,6 +53,7 @@ type MessageKey =
   | 'summaryMode'
   | 'summaryPreferences'
   | 'summarizeActivePage'
+  | 'summarizePdf'
   | 'summarizing'
   | 'tldr'
   | 'workspace';
@@ -59,6 +66,7 @@ const messages: Record<UiLanguage, Record<MessageKey, string>> = {
     baseUrl: 'Base URL',
     bullets: 'Key Points',
     chatModel: 'Chat model',
+    choosePdf: 'Choose PDF',
     claims: 'Claims',
     clearKnowledge: 'Clear Local Knowledge',
     confidence: 'Confidence',
@@ -67,8 +75,10 @@ const messages: Record<UiLanguage, Record<MessageKey, string>> = {
     defaultProvider: 'Use as default provider',
     defaultProviderHint: 'Enabled providers can also be selected directly in the side panel before summarizing.',
     detailedSummary: 'Detailed Summary',
+    directPdfReadFailed: 'Could not read the opened PDF directly.',
     enabled: 'Enabled',
     enabledCount: 'Enabled',
+    extractingPdf: 'Extracting PDF...',
     extractorHint: 'Built-in extractors and JSON selector rules. Rule packs never execute remote JavaScript.',
     interfaceLanguage: 'Interface language',
     keyPlaceholder: 'Paste API key',
@@ -82,8 +92,11 @@ const messages: Record<UiLanguage, Record<MessageKey, string>> = {
     noEnabledProvider: 'No enabled provider. Configure one official API first.',
     openKnowledge: 'Open Knowledge',
     openQuestions: 'Open Questions',
+    openWorkspaceToImportPdf: 'Open the workspace to summarize the PDF. Pagee can try the opened PDF first and fall back to file selection.',
     openWorkspace: 'Open Workspace',
     options: 'Options',
+    pdfHint: 'Pagee will first try to read the PDF already open in Chrome. It extracts selectable text and renders page images for vision-capable models. If Chrome blocks direct access, use Choose PDF as the local fallback.',
+    pdfTarget: 'PDF target',
     privacy: 'Privacy and Local Storage',
     providerPermissionDenied: 'Permission was not granted for this provider.',
     providerSettings: 'Provider Settings',
@@ -99,6 +112,7 @@ const messages: Record<UiLanguage, Record<MessageKey, string>> = {
     summaryMode: 'Summary mode',
     summaryPreferences: 'Summary Preferences',
     summarizeActivePage: 'Summarize Active Page',
+    summarizePdf: 'Summarize PDF',
     summarizing: 'Summarizing...',
     tldr: 'TLDR',
     workspace: 'Workspace'
@@ -110,6 +124,7 @@ const messages: Record<UiLanguage, Record<MessageKey, string>> = {
     baseUrl: 'Base URL',
     bullets: '关键要点',
     chatModel: '对话模型',
+    choosePdf: '选择 PDF',
     claims: '关键论断',
     clearKnowledge: '清空本地知识库',
     confidence: '置信度',
@@ -118,8 +133,10 @@ const messages: Record<UiLanguage, Record<MessageKey, string>> = {
     defaultProvider: '设为默认服务商',
     defaultProviderHint: '已启用的服务商也可以在侧边栏摘要前直接切换。',
     detailedSummary: '详细摘要',
+    directPdfReadFailed: '无法直接读取当前已打开的 PDF。',
     enabled: '启用',
     enabledCount: '已启用',
+    extractingPdf: '正在提取 PDF...',
     extractorHint: '内置抽取器与 JSON selector 规则包。规则包不会执行远程 JavaScript。',
     interfaceLanguage: '界面语言',
     keyPlaceholder: '粘贴 API Key',
@@ -133,8 +150,11 @@ const messages: Record<UiLanguage, Record<MessageKey, string>> = {
     noEnabledProvider: '还没有启用服务商，请先配置一个官方 API。',
     openKnowledge: '打开知识库',
     openQuestions: '开放问题',
+    openWorkspaceToImportPdf: '打开工作区摘要 PDF。Pagee 会先尝试读取已打开的 PDF，失败时再用文件选择兜底。',
     openWorkspace: '打开工作区',
     options: '设置',
+    pdfHint: 'Pagee 会先尝试读取 Chrome 中已经打开的 PDF，并提取可选中文本、为视觉模型渲染页图。如果 Chrome 阻止直接访问，可以用“选择 PDF”作为本地兜底。',
+    pdfTarget: 'PDF 目标',
     privacy: '隐私与本地存储',
     providerPermissionDenied: '未获得该服务商的访问权限。',
     providerSettings: '服务商设置',
@@ -150,6 +170,7 @@ const messages: Record<UiLanguage, Record<MessageKey, string>> = {
     summaryMode: '摘要模式',
     summaryPreferences: '摘要偏好',
     summarizeActivePage: '摘要当前页面',
+    summarizePdf: '摘要 PDF',
     summarizing: '摘要中...',
     tldr: '一句话总结',
     workspace: '工作区'

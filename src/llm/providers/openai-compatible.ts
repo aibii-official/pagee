@@ -1,8 +1,10 @@
-import type { LLMChatRequest } from '../types';
+import type { LLMChatRequest, LLMMessage, LLMMessageContent } from '../types';
+import { supportedImageDataUrl } from '../../shared/media';
 
 interface OpenAIMessagePart {
   type?: string;
   text?: string;
+  image_url?: { url: string };
 }
 
 interface OpenAIChoice {
@@ -32,8 +34,29 @@ class ProviderRequestError extends Error {
   }
 }
 
-const DEFAULT_TIMEOUT_MS = 90000;
 type OpenAIContent = string | OpenAIMessagePart[] | null | undefined;
+
+function toOpenAIContent(content: LLMMessageContent): string | OpenAIMessagePart[] {
+  if (typeof content === 'string') {
+    return content;
+  }
+
+  return content.flatMap((part): OpenAIMessagePart[] => {
+    if (part.type !== 'image') {
+      return [{ type: 'text', text: part.text }];
+    }
+
+    const url = supportedImageDataUrl(part.dataUrl);
+    return url ? [{ type: 'image_url', image_url: { url } }] : [];
+  });
+}
+
+function toOpenAIMessages(messages: LLMMessage[]): Array<{ role: string; content: string | OpenAIMessagePart[] }> {
+  return messages.map((message) => ({
+    role: message.role,
+    content: toOpenAIContent(message.content)
+  }));
+}
 
 function textFromContent(content: OpenAIContent): string {
   if (typeof content === 'string') {
@@ -55,7 +78,7 @@ function buildBody(request: LLMChatRequest, includeJsonMode: boolean): Record<st
   const { provider, messages, parameters } = request;
   const body: Record<string, unknown> = {
     model: provider.chatModel,
-    messages,
+    messages: toOpenAIMessages(messages),
     ...(parameters.extraBody ?? {})
   };
   const maxTokensField = parameters.maxTokensField ?? 'max_tokens';
@@ -80,7 +103,7 @@ function buildBody(request: LLMChatRequest, includeJsonMode: boolean): Record<st
 async function postChatCompletion(request: LLMChatRequest, includeJsonMode: boolean): Promise<OpenAIResponse> {
   const endpoint = `${request.provider.baseUrl.replace(/\/$/, '')}/chat/completions`;
   const body = buildBody(request, includeJsonMode);
-  const response = await fetchWithProviderAuth(endpoint, request.provider.name, request.provider.apiKey, body, request.parameters.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  const response = await fetchWithProviderAuth(endpoint, request.provider.apiKey, body);
   const raw = await response.text();
   const payload = raw ? (JSON.parse(raw) as OpenAIResponse) : ({} as OpenAIResponse);
 
@@ -95,33 +118,17 @@ async function postChatCompletion(request: LLMChatRequest, includeJsonMode: bool
 
 async function fetchWithProviderAuth(
   endpoint: string,
-  providerName: string,
   apiKey: string,
-  body: Record<string, unknown>,
-  timeoutMs: number
+  body: Record<string, unknown>
 ): Promise<Response> {
-  const controller = new AbortController();
-  const timer = globalThis.setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    return await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${apiKey}`
-      },
-      signal: controller.signal,
-      body: JSON.stringify(body)
-    });
-  } catch (error) {
-    if ((error as Error).name === 'AbortError') {
-      throw new Error(`${providerName} timed out after ${Math.round(timeoutMs / 1000)}s. Try a faster model or a shorter summary mode.`);
-    }
-
-    throw error;
-  } finally {
-    globalThis.clearTimeout(timer);
-  }
+  return fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify(body)
+  });
 }
 
 function extractContent(payload: OpenAIResponse): string {
@@ -137,6 +144,10 @@ function extractContent(payload: OpenAIResponse): string {
   }
 
   return '';
+}
+
+function finishReason(payload: OpenAIResponse): string | undefined | null {
+  return payload.choices?.[0]?.finish_reason;
 }
 
 function describeEmptyResponse(providerName: string, model: string, payload: OpenAIResponse): string {
@@ -171,6 +182,22 @@ function temperatureConstraintFromError(error: unknown): number | undefined {
   return Number.isFinite(value) ? value : undefined;
 }
 
+function maxTokenConstraintFromError(error: unknown, currentMaxTokens: number): number | undefined {
+  const message = (error as Error).message;
+  const lower = message.toLowerCase();
+
+  if (!lower.includes('max') || !lower.includes('token')) {
+    return undefined;
+  }
+
+  const candidates = Array.from(message.matchAll(/\b\d{3,6}\b/g))
+    .map((match) => Number(match[0]))
+    .filter((value) => Number.isFinite(value) && value > 0 && value < currentMaxTokens)
+    .sort((left, right) => right - left);
+
+  return candidates[0];
+}
+
 function shouldRetryWithoutTemperature(error: unknown): boolean {
   const message = (error as Error).message.toLowerCase();
   return message.includes('invalid temperature') || message.includes('temperature') && message.includes('not supported');
@@ -181,6 +208,20 @@ async function withProviderParameterRecovery(request: LLMChatRequest, includeJso
     return await postChatCompletion(request, includeJsonMode);
   } catch (error) {
     const exactTemperature = temperatureConstraintFromError(error);
+    const providerMaxTokens = maxTokenConstraintFromError(error, request.parameters.maxTokens);
+
+    if (typeof providerMaxTokens === 'number') {
+      return postChatCompletion(
+        {
+          ...request,
+          parameters: {
+            ...request.parameters,
+            maxTokens: providerMaxTokens
+          }
+        },
+        includeJsonMode
+      );
+    }
 
     if (typeof exactTemperature === 'number') {
       return postChatCompletion(
@@ -216,6 +257,9 @@ async function withProviderParameterRecovery(request: LLMChatRequest, includeJso
 export async function callOpenAICompatible(request: LLMChatRequest): Promise<string> {
   const includeJsonMode = Boolean(request.provider.supportsJsonMode && request.parameters.jsonMode !== false);
   const firstPayload = await withProviderParameterRecovery(request, includeJsonMode);
+  if (finishReason(firstPayload) === 'length') {
+    throw new Error(`${request.provider.name} stopped because the output token limit was reached for ${request.provider.chatModel}.`);
+  }
   const firstContent = extractContent(firstPayload);
 
   if (firstContent) {
@@ -224,6 +268,9 @@ export async function callOpenAICompatible(request: LLMChatRequest): Promise<str
 
   if (includeJsonMode) {
     const retryPayload = await withProviderParameterRecovery(request, false);
+    if (finishReason(retryPayload) === 'length') {
+      throw new Error(`${request.provider.name} stopped because the output token limit was reached for ${request.provider.chatModel}.`);
+    }
     const retryContent = extractContent(retryPayload);
 
     if (retryContent) {

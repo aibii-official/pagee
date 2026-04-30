@@ -13,16 +13,30 @@ export interface LLMProviderConfig {
   apiKey: string;
   chatModel: string;
   embeddingModel?: string;
+  discoveredModels?: LLMProviderDiscoveredModel[];
+  modelsFetchedAt?: number;
   supportsStreaming: boolean;
   supportsJsonMode?: boolean;
   enabled: boolean;
+}
+
+export interface LLMProviderDiscoveredModel {
+  id: string;
+  label?: string;
+  description?: string;
+  contextWindow?: number;
+  maxOutputTokens?: number;
+  capabilities?: {
+    vision?: boolean;
+  };
+  source: 'official-api';
 }
 
 export type SummaryMode = 'short' | 'medium' | 'long' | 'study' | 'research';
 
 export type ContentType = 'article' | 'tweet-thread' | 'video' | 'pdf' | 'selection' | 'generic';
 
-export type ContentBlockType = 'heading' | 'paragraph' | 'quote' | 'tweet' | 'caption' | 'code' | 'list' | 'table';
+export type ContentBlockType = 'heading' | 'paragraph' | 'quote' | 'tweet' | 'caption' | 'code' | 'list' | 'table' | 'image';
 
 export interface ContentBlock {
   id: string;
@@ -31,6 +45,20 @@ export interface ContentBlock {
   source?: string;
   timestamp?: number;
   selector?: string;
+}
+
+export interface ContentMedia {
+  id: string;
+  assetId?: string;
+  type: 'image';
+  mimeType: string;
+  url?: string;
+  dataUrl?: string;
+  source?: string;
+  pageNumber?: number;
+  description?: string;
+  width?: number;
+  height?: number;
 }
 
 export interface ExtractionQuality {
@@ -54,6 +82,7 @@ export interface ExtractedContent {
   contentType: ContentType;
   text: string;
   blocks: ContentBlock[];
+  media?: ContentMedia[];
   metadata: Record<string, unknown>;
   quality: ExtractionQuality;
 }

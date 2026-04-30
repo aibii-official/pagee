@@ -1,28 +1,28 @@
-import { summarizeWithProvider } from '../llm/providers';
-import { getModelOption } from '../llm/model-catalog';
-import { createId, sha256 } from '../shared/hash';
+import { shouldAttemptVisionForProvider } from '../llm/model-registry';
+import { discoverOfficialModels } from '../llm/model-discovery';
+import { runExtractedContentSummary, selectSummaryProvider } from './summary-task-runner';
 import {
   RuntimeMessage,
   type ContentExtractionResponse,
   type ContentRequest,
   type MessageEnvelope,
-  type RuntimeRequest
+  type RuntimeRequest,
+  type SummaryProgressStage
 } from '../shared/messages';
 import type {
-  DocumentMemory,
+  ContentMedia,
   ExtractedContent,
   LLMProviderConfig,
   SummaryMode,
   SummaryTaskResult,
-  SummaryVersion,
   UserSettings
 } from '../shared/types';
+import { isFilePdfUrl, isHttpPageUrl } from '../shared/url';
 import {
   clearLibrary,
   getLibraryEntryForUrl,
   listLibraryEntries,
-  saveExtractionLog,
-  saveSummarySnapshot
+  saveExtractionLog
 } from '../storage/repositories';
 import {
   ensureProviderPermission,
@@ -39,12 +39,30 @@ interface TabTarget {
 
 const lastRegularTabByWindow = new Map<number, number>();
 
-function isRegularPageUrl(url?: string): boolean {
-  return Boolean(url?.startsWith('http://') || url?.startsWith('https://'));
+function publishSummaryProgress(
+  taskId: string | undefined,
+  stage: SummaryProgressStage,
+  message: string,
+  current?: number,
+  total?: number
+): void {
+  if (!taskId) {
+    return;
+  }
+
+  void chrome.runtime.sendMessage({
+    type: RuntimeMessage.SummaryProgress,
+    taskId,
+    stage,
+    message,
+    current,
+    total,
+    updatedAt: Date.now()
+  }).catch(() => undefined);
 }
 
 function rememberRegularTab(tab?: chrome.tabs.Tab): void {
-  if (tab?.id && typeof tab.windowId === 'number' && isRegularPageUrl(tab.url)) {
+  if (tab?.id && typeof tab.windowId === 'number' && isHttpPageUrl(tab.url)) {
     lastRegularTabByWindow.set(tab.windowId, tab.id);
   }
 }
@@ -96,14 +114,18 @@ async function getFallbackRegularTab(windowId?: number): Promise<chrome.tabs.Tab
 
   const fallbackTabId = lastRegularTabByWindow.get(windowId);
   const fallbackTab = await getTabById(fallbackTabId);
-  return isRegularPageUrl(fallbackTab?.url) ? fallbackTab : undefined;
+  return isHttpPageUrl(fallbackTab?.url) ? fallbackTab : undefined;
 }
 
 async function getTargetTab(target: TabTarget = {}): Promise<chrome.tabs.Tab> {
   const explicitTab = await getTabById(target.tabId);
-  if (explicitTab?.id && isRegularPageUrl(explicitTab.url)) {
+  if (explicitTab?.id && isHttpPageUrl(explicitTab.url)) {
     rememberRegularTab(explicitTab);
     return explicitTab;
+  }
+
+  if (isFilePdfUrl(explicitTab?.url ?? target.url)) {
+    throw new Error('This is a local PDF. Open the Pagee workspace and choose the PDF file to summarize it locally.');
   }
 
   const fallbackForExplicitWindow = await getFallbackRegularTab(target.windowId ?? explicitTab?.windowId);
@@ -113,9 +135,13 @@ async function getTargetTab(target: TabTarget = {}): Promise<chrome.tabs.Tab> {
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-  if (tab?.id && isRegularPageUrl(tab.url)) {
+  if (tab?.id && isHttpPageUrl(tab.url)) {
     rememberRegularTab(tab);
     return tab;
+  }
+
+  if (isFilePdfUrl(tab?.url ?? target.url)) {
+    throw new Error('This is a local PDF. Open the Pagee workspace and choose the PDF file to summarize it locally.');
   }
 
   const fallbackForCurrentWindow = await getFallbackRegularTab(target.windowId ?? tab?.windowId);
@@ -132,7 +158,7 @@ async function getTargetTab(target: TabTarget = {}): Promise<chrome.tabs.Tab> {
     return candidate;
   }
 
-  throw new Error(`Pagee can only summarize regular http(s) pages. Current target: ${candidate.url}`);
+  throw new Error(`Pagee can only summarize regular http(s) pages directly. Current target: ${candidate.url}`);
 }
 
 async function extractActiveTab(target: TabTarget = {}, selectionText?: string): Promise<ExtractedContent> {
@@ -182,63 +208,59 @@ async function extractActiveTab(target: TabTarget = {}, selectionText?: string):
   return response.content;
 }
 
-function selectProvider(settings: UserSettings, providerId?: string, chatModel?: string): LLMProviderConfig {
-  const provider = providerId
-    ? settings.providers.find((candidate) => candidate.id === providerId && candidate.enabled)
-    : settings.providers.find((candidate) => candidate.id === settings.activeProviderId && candidate.enabled) ??
-      settings.providers.find((candidate) => candidate.enabled);
-
-  if (!provider) {
-    throw new Error('No enabled provider. Configure an official API provider in Options first.');
+async function attachVisibleTabScreenshot(
+  content: ExtractedContent,
+  tab: chrome.tabs.Tab,
+  provider: LLMProviderConfig
+): Promise<ExtractedContent> {
+  if (!tab.windowId || content.contentType === 'selection' || content.contentType === 'pdf' || !shouldAttemptVisionForProvider(provider, provider.chatModel)) {
+    return content;
   }
 
-  if (!provider.apiKey.trim()) {
-    throw new Error(`${provider.name} is enabled but has no API key.`);
-  }
+  try {
+    const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 70 });
+    const media: ContentMedia = {
+      id: 'visible-page-screenshot',
+      type: 'image',
+      mimeType: 'image/jpeg',
+      dataUrl,
+      source: 'Visible viewport screenshot',
+      description: 'Screenshot of the currently visible part of the page at summary time.'
+    };
 
-  const selectedModel = getModelOption(provider.id, chatModel?.trim() || provider.chatModel);
-  if (!selectedModel) {
-    throw new Error(`${provider.name} has no supported model in Pagee's model catalog.`);
+    return {
+      ...content,
+      media: [...(content.media ?? []), media],
+      metadata: {
+        ...content.metadata,
+        capturedVisibleViewport: true
+      },
+      quality: {
+        ...content.quality,
+        warnings: [...content.quality.warnings, 'A visible viewport screenshot is available for the selected vision-capable model.']
+      }
+    };
+  } catch {
+    return content;
   }
-
-  return { ...provider, chatModel: selectedModel.id };
 }
 
-async function createTransientSnapshot(
+async function summarizeExtractedContent(
   content: ExtractedContent,
   mode: SummaryMode,
-  summaryVersion: Omit<SummaryVersion, 'id' | 'documentId' | 'createdAt'>
-): Promise<{ document: DocumentMemory; summaryVersion: SummaryVersion }> {
-  const now = Date.now();
-  const contentHash = await sha256(content.text);
-  const documentId = `transient_${crypto.randomUUID()}`;
-  const summaryId = createId('summary');
-  const document: DocumentMemory = {
-    id: documentId,
-    url: content.url,
-    canonicalUrl: content.canonicalUrl,
-    title: content.title,
-    contentHash,
-    contentType: content.contentType,
-    extractedContentId: `transient_content_${contentHash.slice(0, 24)}`,
-    summaryIds: [summaryId],
-    tags: [],
-    topics: summaryVersion.summary.topics,
-    entityIds: summaryVersion.summary.entities,
-    createdAt: now,
-    updatedAt: now
-  };
-
-  return {
-    document,
-    summaryVersion: {
-      ...summaryVersion,
-      id: summaryId,
-      documentId,
-      mode,
-      createdAt: now
-    }
-  };
+  feedback?: string[],
+  providerId?: string,
+  chatModel?: string,
+  taskId?: string
+): Promise<SummaryTaskResult> {
+  return runExtractedContentSummary({
+    content,
+    mode,
+    feedback,
+    providerId,
+    chatModel,
+    publishProgress: (stage, message, current, total) => publishSummaryProgress(taskId, stage, message, current, total)
+  });
 }
 
 async function summarizeActiveTab(
@@ -247,52 +269,66 @@ async function summarizeActiveTab(
   selectionText?: string,
   target: TabTarget = {},
   providerId?: string,
-  chatModel?: string
+  chatModel?: string,
+  taskId?: string
 ): Promise<SummaryTaskResult> {
+  publishSummaryProgress(taskId, 'extracting', 'Reading current page');
+  const tab = await getTargetTab(target);
   const settings = await getSettings();
-  const provider = selectProvider(settings, providerId, chatModel);
-  await ensureProviderPermission(provider);
-  const content = await extractActiveTab(target, selectionText);
-  const summary = await summarizeWithProvider(provider, content, mode, settings.summaryPreferences, feedback);
-
-  const stored = settings.privacy.saveSummaries
-    ? await saveSummarySnapshot({
-        content,
-        summary,
-        provider,
-        mode,
-        feedback,
-        saveExtractedText: settings.privacy.saveExtractedText
-      })
-    : await createTransientSnapshot(content, mode, {
-        extractorId: content.extractorId,
-        providerId: provider.id,
-        model: provider.chatModel,
-        promptVersion: 'summary-json-v1',
-        mode,
-        summary,
-        feedback
-      });
-
-  return {
-    content,
-    document: stored.document,
-    summaryVersion: stored.summaryVersion,
-    providerName: provider.name
-  };
+  const provider = selectSummaryProvider(settings, providerId, chatModel);
+  const content = await extractActiveTab({ tabId: tab.id, windowId: tab.windowId, url: tab.url }, selectionText);
+  const contentWithMedia = await attachVisibleTabScreenshot(content, tab, provider);
+  const mediaCount = contentWithMedia.media?.length ?? 0;
+  if (mediaCount > 0) {
+    publishSummaryProgress(
+      taskId,
+      'preparing',
+      shouldAttemptVisionForProvider(provider, provider.chatModel)
+        ? `Prepared ${mediaCount} visual attachment${mediaCount === 1 ? '' : 's'} for ${provider.chatModel}`
+        : `Found ${mediaCount} visual attachment${mediaCount === 1 ? '' : 's'}, but ${provider.chatModel} is marked text-only by provider metadata`
+    );
+  }
+  return summarizeExtractedContent(contentWithMedia, mode, feedback, providerId, chatModel, taskId);
 }
 
 async function getCurrentPageMemory(target: TabTarget = {}) {
-  if (isRegularPageUrl(target.url)) {
+  if (isHttpPageUrl(target.url) || isFilePdfUrl(target.url)) {
     return getLibraryEntryForUrl(target.url as string);
   }
 
   const tab = await getTabById(target.tabId);
-  if (isRegularPageUrl(tab?.url)) {
+  if (isHttpPageUrl(tab?.url) || isFilePdfUrl(tab?.url)) {
     return getLibraryEntryForUrl(tab?.url as string);
   }
 
   return undefined;
+}
+
+async function refreshProviderModels(providerId: string): Promise<UserSettings> {
+  const settings = await getSettings();
+  const provider = settings.providers.find((candidate) => candidate.id === providerId);
+
+  if (!provider) {
+    throw new Error(`Unknown provider: ${providerId}`);
+  }
+
+  await ensureProviderPermission(provider);
+  const discoveredModels = await discoverOfficialModels(provider);
+  const nextSettings: UserSettings = {
+    ...settings,
+    providers: settings.providers.map((candidate) =>
+      candidate.id === providerId
+        ? {
+            ...candidate,
+            discoveredModels,
+            modelsFetchedAt: Date.now(),
+            chatModel: discoveredModels.some((model) => model.id === candidate.chatModel) ? candidate.chatModel : discoveredModels[0]?.id ?? candidate.chatModel
+          }
+        : candidate
+    )
+  };
+
+  return saveSettings(nextSettings);
 }
 
 async function handleRuntimeMessage(message: RuntimeRequest): Promise<unknown> {
@@ -301,12 +337,20 @@ async function handleRuntimeMessage(message: RuntimeRequest): Promise<unknown> {
       return getSettings();
     case RuntimeMessage.SaveSettings:
       return saveSettings(message.settings);
+    case RuntimeMessage.RefreshProviderModels:
+      return refreshProviderModels(message.providerId);
     case RuntimeMessage.SummarizeActiveTab:
       return summarizeActiveTab(message.mode, message.feedback, message.selectionText, {
         tabId: message.tabId,
         windowId: message.windowId,
         url: message.url
-      }, message.providerId, message.chatModel);
+      }, message.providerId, message.chatModel, message.taskId);
+    case RuntimeMessage.SummarizeExtractedContent:
+      return summarizeExtractedContent(message.content, message.mode, message.feedback, message.providerId, message.chatModel, message.taskId);
+    case RuntimeMessage.PageStateChanged:
+      return { received: true };
+    case RuntimeMessage.SummaryProgress:
+      return { received: true };
     case RuntimeMessage.GetCurrentPageMemory:
       return getCurrentPageMemory({ tabId: message.tabId, windowId: message.windowId, url: message.url });
     case RuntimeMessage.ListLibrary:

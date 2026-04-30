@@ -1,5 +1,5 @@
 import { BUILT_IN_EXTRACTORS } from '../extractors/catalog';
-import { normalizeProviderModel } from '../llm/model-catalog';
+import { normalizeProviderModel } from '../llm/model-registry';
 import type { ExtractorRuntimeSettings, LLMProviderConfig, UserSettings } from '../shared/types';
 
 const SETTINGS_KEY = 'pagee:user-settings:v1';

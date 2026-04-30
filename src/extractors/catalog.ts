@@ -22,6 +22,13 @@ export const BUILT_IN_EXTRACTORS: ExtractorCatalogItem[] = [
     builtIn: true
   },
   {
+    id: 'pdf-file',
+    name: 'PDF File',
+    description: 'Extracts text from user-selected local PDF files in the extension UI.',
+    defaultPriority: 80,
+    builtIn: true
+  },
+  {
     id: 'generic-readability',
     name: 'Readability Article',
     description: 'Extracts article-like pages with Mozilla Readability.',

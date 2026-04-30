@@ -38,6 +38,13 @@ function extractJsonObject(raw: string): string {
   return stripped;
 }
 
+export class SummaryParseError extends Error {
+  constructor(message: string, readonly raw: string) {
+    super(message);
+    this.name = 'SummaryParseError';
+  }
+}
+
 export function parseSummaryResult(raw: string): SummaryResult {
   try {
     const parsed = JSON.parse(extractJsonObject(raw)) as unknown;
@@ -46,17 +53,9 @@ export function parseSummaryResult(raw: string): SummaryResult {
     if (result.success) {
       return result.data;
     }
-  } catch {
-    // Fall through to a low-confidence summary so the UI can still save and display the model output.
+  } catch (error) {
+    throw new SummaryParseError(`Provider returned invalid or truncated summary JSON: ${(error as Error).message}`, raw);
   }
 
-  return {
-    tldr: raw.slice(0, 800),
-    bullets: [],
-    keyClaims: [],
-    entities: [],
-    topics: [],
-    quotes: [],
-    confidence: 'low'
-  };
+  throw new SummaryParseError('Provider returned summary JSON that does not match the required schema.', raw);
 }

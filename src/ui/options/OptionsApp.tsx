@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BUILT_IN_EXTRACTORS } from '../../extractors/catalog';
-import { formatModelParameters, getModelOption, getModelOptions } from '../../llm/model-catalog';
+import { formatModelParameters, getModelOptionForProvider, getModelOptionsForProvider } from '../../llm/model-registry';
 import { RuntimeMessage, sendRuntimeMessage } from '../../shared/messages';
 import type { DeclarativeExtractionRule, LLMProviderConfig, SummaryPreferences, UiLanguage, UserSettings } from '../../shared/types';
 import { getProviderOriginPattern } from '../../storage/settings';
@@ -44,8 +44,8 @@ export function OptionsApp() {
   const language = settings?.uiLanguage ?? 'en';
   const enabledProviders = useMemo(() => settings?.providers.filter((provider) => provider.enabled) ?? [], [settings]);
   const selectedProvider = settings?.providers.find((provider) => provider.id === selectedProviderId) ?? settings?.providers[0];
-  const selectedProviderModels = getModelOptions(selectedProvider?.id);
-  const selectedModel = selectedProvider ? getModelOption(selectedProvider.id, selectedProvider.chatModel) : undefined;
+  const selectedProviderModels = getModelOptionsForProvider(selectedProvider);
+  const selectedModel = selectedProvider ? getModelOptionForProvider(selectedProvider, selectedProvider.chatModel) : undefined;
 
   async function save(nextSettings = settings, toast = t(language, 'settingsSaved')) {
     if (!nextSettings) return;
@@ -94,6 +94,21 @@ export function OptionsApp() {
   function patchSelectedProvider(patch: Partial<LLMProviderConfig>) {
     if (!settings || !selectedProvider) return;
     setSettings(updateProvider(settings, selectedProvider.id, patch));
+  }
+
+  async function refreshModels() {
+    if (!selectedProvider) return;
+    setError(undefined);
+    setStatus('Refreshing official model list...');
+
+    try {
+      const saved = await sendRuntimeMessage({ type: RuntimeMessage.RefreshProviderModels, providerId: selectedProvider.id });
+      setSettings(saved);
+      setStatus(`Loaded ${saved.providers.find((provider) => provider.id === selectedProvider.id)?.discoveredModels?.length ?? 0} official models.`);
+    } catch (err) {
+      setError((err as Error).message);
+      setStatus(undefined);
+    }
   }
 
   if (!settings || !selectedProvider) {
@@ -181,12 +196,16 @@ export function OptionsApp() {
               </div>
               <div className="field">
                 <label>{t(language, 'chatModel')}</label>
-                <select value={selectedModel?.id ?? ''} onChange={(event) => patchSelectedProvider({ chatModel: event.target.value })}>
+                <select value={selectedProvider.chatModel} onChange={(event) => patchSelectedProvider({ chatModel: event.target.value })}>
                   {selectedProviderModels.map((model) => (
                     <option key={model.id} value={model.id}>{model.label}</option>
                   ))}
                 </select>
               </div>
+            </div>
+            <div className="row wrap">
+              <button className="secondary" type="button" onClick={() => void refreshModels()}>Refresh official models</button>
+              {selectedProvider.modelsFetchedAt && <span className="pill good">Fetched {new Date(selectedProvider.modelsFetchedAt).toLocaleString()}</span>}
             </div>
             {selectedModel && (
               <div className="model-card">
@@ -195,7 +214,7 @@ export function OptionsApp() {
                   {selectedModel.contextWindow && <span className="pill">{Math.round(selectedModel.contextWindow / 1000)}K ctx</span>}
                 </div>
                 <p className="muted">{selectedModel.description}</p>
-                <p className="muted">Recommended: {formatModelParameters(selectedModel)}</p>
+                <p className="muted">Model parameters: {formatModelParameters(selectedModel)}</p>
               </div>
             )}
             <div className="field">

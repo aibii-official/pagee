@@ -2,6 +2,7 @@ import { SUMMARY_PROMPT_VERSION } from '../llm/prompts/summarize';
 import { createId, sha256 } from '../shared/hash';
 import { normalizeUrlForLookup, urlLookupCandidates, urlsMatchForLookup } from '../shared/url';
 import type {
+  ContentMedia,
   DocumentMemory,
   ExtractedContent,
   ExtractorRunLog,
@@ -11,7 +12,7 @@ import type {
   SummaryResult,
   SummaryVersion
 } from '../shared/types';
-import { db, type ExtractedContentRecord } from './db';
+import { db, type ExtractedContentRecord, type MediaAssetRecord } from './db';
 
 export interface SaveSummarySnapshotInput {
   content: ExtractedContent;
@@ -28,6 +29,46 @@ function compactId(prefix: string, hash: string): string {
 
 function entityId(name: string): string {
   return `entity_${name.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '_').replace(/^_+|_+$/g, '')}`;
+}
+
+function mediaHashSource(item: ContentMedia): string {
+  return [item.type, item.mimeType, item.url, item.dataUrl, item.source, item.description, item.pageNumber, item.width, item.height]
+    .filter((value) => value !== undefined && value !== null && value !== '')
+    .join('\n');
+}
+
+async function prepareMediaAssets(
+  media: ContentMedia[] | undefined,
+  documentId: string,
+  extractedContentId: string,
+  createdAt: number
+): Promise<{ records: MediaAssetRecord[]; refs: ContentMedia[] }> {
+  const records: MediaAssetRecord[] = [];
+  const refs: ContentMedia[] = [];
+
+  for (const item of media ?? []) {
+    const mediaHash = await sha256(mediaHashSource(item));
+    const assetId = compactId('media', mediaHash);
+    const { id: mediaId, assetId: _assetId, ...asset } = item;
+
+    records.push({
+      ...asset,
+      id: assetId,
+      mediaId,
+      mediaHash,
+      documentId,
+      extractedContentId,
+      createdAt
+    });
+
+    refs.push({
+      ...item,
+      assetId,
+      dataUrl: undefined
+    });
+  }
+
+  return { records, refs };
 }
 
 function includesQuery(entry: LibraryEntry, query: string): boolean {
@@ -56,7 +97,10 @@ export async function saveSummarySnapshot(input: SaveSummarySnapshotInput): Prom
   summaryVersion: SummaryVersion;
 }> {
   const now = Date.now();
-  const contentHash = await sha256(input.content.text);
+  const mediaHashSource = (input.content.media ?? [])
+    .map((item) => [item.id, item.source, item.description, item.url, item.dataUrl].filter(Boolean).join('\n'))
+    .join('\n\n');
+  const contentHash = await sha256([input.content.text, mediaHashSource].filter(Boolean).join('\n\n'));
   const docHash = await sha256(normalizeUrlForLookup(input.content.canonicalUrl || input.content.url) ?? input.content.url);
   const documentId = compactId('doc', docHash);
   const extractedContentId = compactId('content', contentHash);
@@ -97,13 +141,21 @@ export async function saveSummarySnapshot(input: SaveSummarySnapshotInput): Prom
     contentHash,
     createdAt: now,
     text: input.saveExtractedText ? input.content.text : '',
-    blocks: input.saveExtractedText ? input.content.blocks : []
+    blocks: input.saveExtractedText ? input.content.blocks : [],
+    media: []
   };
+  const mediaAssets = input.saveExtractedText
+    ? await prepareMediaAssets(input.content.media, documentId, extractedContentId, now)
+    : { records: [], refs: [] };
+  extractedContent.media = mediaAssets.refs;
 
-  await db.transaction('rw', db.extractedContents, db.documents, db.summaries, async () => {
+  await db.transaction('rw', db.extractedContents, db.documents, db.summaries, db.mediaAssets, async () => {
     await db.extractedContents.put(extractedContent);
     await db.documents.put(documentMemory);
     await db.summaries.put(summaryVersion);
+    if (mediaAssets.records.length > 0) {
+      await db.mediaAssets.bulkPut(mediaAssets.records);
+    }
   });
 
   return { document: documentMemory, summaryVersion };
@@ -168,13 +220,14 @@ export async function listRecentExtractionLogs(limit = 20): Promise<ExtractorRun
 export async function clearLibrary(): Promise<void> {
   await db.transaction(
     'rw',
-    [db.documents, db.summaries, db.extractedContents, db.extractionLogs, db.knowledgeNodes, db.knowledgeEdges],
+    [db.documents, db.summaries, db.extractedContents, db.extractionLogs, db.mediaAssets, db.knowledgeNodes, db.knowledgeEdges],
     async () => {
       await Promise.all([
         db.documents.clear(),
         db.summaries.clear(),
         db.extractedContents.clear(),
         db.extractionLogs.clear(),
+        db.mediaAssets.clear(),
         db.knowledgeNodes.clear(),
         db.knowledgeEdges.clear()
       ]);

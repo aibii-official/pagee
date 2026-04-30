@@ -15,6 +15,36 @@ const TRACKING_PARAMS = new Set([
   'utm_term'
 ]);
 
+export function isHttpPageUrl(url?: string): boolean {
+  return Boolean(url?.startsWith('http://') || url?.startsWith('https://'));
+}
+
+export function isFilePdfUrl(value?: string): boolean {
+  if (!value?.trim()) {
+    return false;
+  }
+
+  try {
+    const url = new URL(value);
+    return url.protocol.toLowerCase() === 'file:' && decodeURIComponent(url.pathname).toLowerCase().endsWith('.pdf');
+  } catch {
+    return false;
+  }
+}
+
+export function isPdfLikeUrl(value?: string): boolean {
+  if (!value?.trim()) {
+    return false;
+  }
+
+  try {
+    const url = new URL(value);
+    return decodeURIComponent(url.pathname).toLowerCase().endsWith('.pdf');
+  } catch {
+    return value.trim().replace(/[?#].*$/, '').toLowerCase().endsWith('.pdf');
+  }
+}
+
 function normalizeHost(hostname: string): string {
   const host = hostname.toLowerCase().replace(/^www\./, '');
   return host === 'twitter.com' ? 'x.com' : host;

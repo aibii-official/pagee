@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { RuntimeMessage, sendRuntimeMessage } from '../../shared/messages';
 import type { SummaryTaskResult, UiLanguage } from '../../shared/types';
+import { isPdfLikeUrl } from '../../shared/url';
 import { QualityBadge, SummaryView } from '../components/SummaryView';
 import { t } from '../i18n';
 import { getActiveTabTarget } from '../tab-target';
@@ -30,6 +31,11 @@ export function PopupApp() {
 
     try {
       const target = await getActiveTabTarget();
+      if (isPdfLikeUrl(target.url)) {
+        setError(t(language, 'openWorkspaceToImportPdf'));
+        return;
+      }
+
       const response = await sendRuntimeMessage({ type: RuntimeMessage.SummarizeActiveTab, mode: 'short', ...target });
       setResult(response);
     } catch (err) {
