@@ -1,0 +1,20 @@
+{
+  "id": "substack-post",
+  "version": "1.0.0",
+  "matches": ["*.substack.com", "substack.com"],
+  "contentType": "article",
+  "selectors": {
+    "title": "h1",
+    "author": "[data-testid='author-name'], .byline, .post-meta a",
+    "publishedAt": "time",
+    "content": "article, .available-content, .body"
+  },
+  "remove": ["nav", "footer", ".subscribe-widget", ".subscription-widget-wrap", ".paywall"],
+  "blockSelectors": {
+    "heading": "h1,h2,h3",
+    "paragraph": "p",
+    "quote": "blockquote",
+    "list": "li",
+    "code": "pre,code"
+  }
+}

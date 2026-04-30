@@ -1,0 +1,20 @@
+{
+  "id": "medium-post",
+  "version": "1.0.0",
+  "matches": ["medium.com", "*.medium.com"],
+  "contentType": "article",
+  "selectors": {
+    "title": "h1",
+    "author": "a[rel='author'], [data-testid='authorName']",
+    "publishedAt": "time",
+    "content": "article"
+  },
+  "remove": ["nav", "footer", "[data-testid='responses']", "[aria-label='Post actions']"],
+  "blockSelectors": {
+    "heading": "h1,h2,h3",
+    "paragraph": "p",
+    "quote": "blockquote",
+    "code": "pre,code",
+    "caption": "figcaption"
+  }
+}

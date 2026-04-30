@@ -1,0 +1,21 @@
+{
+  "id": "github-readable-page",
+  "version": "1.0.0",
+  "matches": ["github.com"],
+  "contentType": "article",
+  "selectors": {
+    "title": "strong[itemprop='name'] a, bdi.js-issue-title, h1",
+    "author": ".author, .TimelineItem-avatar",
+    "publishedAt": "relative-time, time-ago, time",
+    "content": "article.markdown-body, .markdown-body, .js-discussion"
+  },
+  "remove": ["nav", "footer", ".js-comment-edit-history", ".reaction-summary-item", ".paginate-container"],
+  "blockSelectors": {
+    "heading": "h1,h2,h3,h4",
+    "paragraph": "p",
+    "quote": "blockquote",
+    "list": "li",
+    "code": "pre,code",
+    "table": "table"
+  }
+}
