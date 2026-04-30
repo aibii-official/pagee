@@ -1,5 +1,5 @@
-import type { ContentBlock, ContentExtractorPlugin } from '../shared/types';
-import { blockTypeForElement, cleanText, createBaseContent, elementSelector, textFromBlocks } from './utils';
+import type { ContentBlock, ContentExtractorPlugin } from '../../shared/types';
+import { blockTypeForElement, cleanText, createBaseContent, elementSelector, textFromBlocks } from '../utils';
 
 const NOISE_SELECTOR = [
   'script',

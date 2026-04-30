@@ -1,6 +1,6 @@
 import { Readability } from '@mozilla/readability';
-import type { ContentExtractorPlugin } from '../shared/types';
-import { blocksFromElement, cleanMultilineText, createBaseContent } from './utils';
+import type { ContentExtractorPlugin } from '../../shared/types';
+import { blocksFromElement, cleanMultilineText, createBaseContent } from '../utils';
 
 export const genericReadabilityExtractor: ContentExtractorPlugin = {
   id: 'generic-readability',

@@ -6,9 +6,7 @@ import type {
   ExtractedContent
 } from '../shared/types';
 import { createDeclarativeRuleExtractor } from './declarative-rule-extractor';
-import { genericReadabilityExtractor } from './generic-readability';
-import { selectionExtractor } from './selection';
-import { visibleTextExtractor } from './visible-text';
+import { CODE_EXTRACTOR_PLUGINS_AFTER_RULES, CODE_EXTRACTOR_PLUGINS_BEFORE_RULES } from './manifest';
 
 export interface ExtractionRunResult {
   content: ExtractedContent;
@@ -28,10 +26,9 @@ function applySettings(plugin: ContentExtractorPlugin, settings: ExtractorRuntim
 
 function createPlugins(settings: ExtractorRuntimeSettings): ContentExtractorPlugin[] {
   return [
-    selectionExtractor,
+    ...CODE_EXTRACTOR_PLUGINS_BEFORE_RULES,
     createDeclarativeRuleExtractor(settings.declarativeRules),
-    genericReadabilityExtractor,
-    visibleTextExtractor
+    ...CODE_EXTRACTOR_PLUGINS_AFTER_RULES
   ]
     .map((plugin) => applySettings(plugin, settings))
     .filter((plugin): plugin is ContentExtractorPlugin => Boolean(plugin))

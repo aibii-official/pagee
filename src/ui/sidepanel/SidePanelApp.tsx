@@ -1,5 +1,5 @@
 import { type ChangeEvent, useEffect, useRef, useState } from 'react';
-import { extractPdfFile, extractPdfUrl } from '../../extractors/pdf-file';
+import { extractPdfFile, extractPdfUrl } from '../../extractors/plugins/pdf-file';
 import { formatModelParameters, getModelOptionForProvider, getModelOptionsForProvider } from '../../llm/model-registry';
 import { RuntimeMessage, sendRuntimeMessage, type SummaryProgressUpdate } from '../../shared/messages';
 import type { ExtractedContent, LibraryEntry, SummaryMode, SummaryTaskResult, UiLanguage, UserSettings } from '../../shared/types';

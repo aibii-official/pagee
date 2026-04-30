@@ -1,5 +1,5 @@
-import type { ContentExtractorPlugin } from '../shared/types';
-import { cleanMultilineText, createBaseContent } from './utils';
+import type { ContentExtractorPlugin } from '../../shared/types';
+import { cleanMultilineText, createBaseContent } from '../utils';
 
 export const selectionExtractor: ContentExtractorPlugin = {
   id: 'selection',

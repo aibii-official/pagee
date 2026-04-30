@@ -1,9 +1,9 @@
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url';
-import { sha256 } from '../shared/hash';
-import { isSupportedImageDataUrl } from '../shared/media';
-import type { ContentBlock, ContentMedia, ExtractedContent } from '../shared/types';
-import { cleanMultilineText, finalizeContent } from './utils';
+import { sha256 } from '../../shared/hash';
+import { isSupportedImageDataUrl } from '../../shared/media';
+import type { ContentBlock, ContentMedia, ExtractedContent } from '../../shared/types';
+import { cleanMultilineText, finalizeContent } from '../utils';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 

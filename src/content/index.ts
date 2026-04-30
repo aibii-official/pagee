@@ -1,6 +1,6 @@
 import { RuntimeMessage, type ContentRequest, type ContentExtractionResponse, type PageStateSnapshot } from '../shared/messages';
 import { runExtractors } from '../extractors/registry';
-import { collectPageMedia } from '../extractors/page-media';
+import { collectPageMedia } from '../extractors/plugins/page-media';
 
 const READY_KEY = '__PAGEE_CONTENT_SCRIPT_READY__';
 const pageWindow = window as unknown as Window & Record<string, boolean | undefined>;
@@ -63,7 +63,7 @@ if (!pageWindow[READY_KEY]) {
         message.settings
       );
 
-      if (result.content.contentType !== 'selection') {
+      if (result.content.contentType !== 'selection' && !result.content.metadata.skipPageMediaCollection) {
         const mediaResult = await collectPageMedia(document);
         const { media } = mediaResult;
         if (media.length > 0) {

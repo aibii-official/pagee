@@ -1,5 +1,5 @@
-import type { ContentMedia } from '../shared/types';
-import { dataUrlMimeType, isSupportedImageMimeType, supportedImageDataUrl } from '../shared/media';
+import type { ContentMedia } from '../../shared/types';
+import { dataUrlMimeType, isSupportedImageMimeType, supportedImageDataUrl } from '../../shared/media';
 
 const MIN_IMAGE_WIDTH = 96;
 const MIN_IMAGE_HEIGHT = 96;

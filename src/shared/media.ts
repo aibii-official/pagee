@@ -25,3 +25,36 @@ export function supportedImageDataUrlMimeType(value?: string): string | undefine
   const mimeType = dataUrlMimeType(value);
   return isSupportedImageMimeType(mimeType) ? mimeType : undefined;
 }
+
+export function isLikelySupportedRemoteImageUrl(value?: string): boolean {
+  if (!value) {
+    return false;
+  }
+
+  try {
+    const url = new URL(value);
+    const path = url.pathname.toLowerCase();
+    const format = normalizedMimeType(url.searchParams.get('format'));
+    const fm = normalizedMimeType(url.searchParams.get('fm'));
+
+    if (/\.(jpe?g|png|webp|gif)$/.test(path)) {
+      return true;
+    }
+
+    if (format && ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(format)) {
+      return true;
+    }
+
+    if (fm && ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(fm)) {
+      return true;
+    }
+
+    return url.hostname.endsWith('twimg.com') && path.includes('/media/');
+  } catch {
+    return false;
+  }
+}
+
+export function supportedRemoteImageUrl(value?: string): string | undefined {
+  return isLikelySupportedRemoteImageUrl(value) ? value : undefined;
+}

@@ -48,12 +48,15 @@ The model selector is provider-aware. Models are selected from Pagee's internal 
 Pagee uses an internal extractor plugin system:
 
 - `selection`: selected text, highest priority.
+- `x-twitter-status`: scoped X/Twitter status conversations, excluding recommendations and unrelated timeline tweets.
 - `declarative-rule`: built-in and user-provided JSON selector rules.
 - `pdf-file`: opened or user-selected PDF files parsed in the extension UI, with all PDF pages rendered for vision-capable models and summarized in batches when needed.
 - `generic-readability`: article extraction with Mozilla Readability.
 - `visible-text`: cleaned visible text fallback.
 
 Built-in declarative rules currently cover Medium, Substack, and GitHub-style readable pages.
+
+Extractor implementation rules are documented in [EXTRACTORS.md](./EXTRACTORS.md). JSON rules live in `src/extractors/rules/`; TypeScript extractors live in `src/extractors/plugins/` and are registered centrally in `src/extractors/manifest.ts` when semantic boundary, media scoping, or SPA logic is required.
 
 ## Local Memory
 

@@ -1,5 +1,5 @@
 import type { ExtractedContent, SummaryMode, SummaryPreferences } from '../../shared/types';
-import { supportedImageDataUrl, supportedImageDataUrlMimeType } from '../../shared/media';
+import { supportedImageDataUrl, supportedImageDataUrlMimeType, supportedRemoteImageUrl } from '../../shared/media';
 import type { LLMImagePart, LLMMessage } from '../types';
 
 export const SUMMARY_PROMPT_VERSION = 'summary-json-v1';
@@ -49,13 +49,13 @@ function mediaSummary(content: ExtractedContent, includeMedia: boolean): string 
 
 function mediaParts(content: ExtractedContent): LLMImagePart[] {
   return (content.media ?? [])
-    .filter((item) => item.type === 'image' && Boolean(supportedImageDataUrl(item.dataUrl)))
+    .filter((item) => item.type === 'image' && Boolean(supportedImageDataUrl(item.dataUrl) || supportedRemoteImageUrl(item.url)))
     .map((item) => ({
       type: 'image',
       id: item.id,
       source: item.source,
       dataUrl: supportedImageDataUrl(item.dataUrl),
-      url: undefined,
+      url: supportedRemoteImageUrl(item.url),
       mimeType: supportedImageDataUrlMimeType(item.dataUrl) || item.mimeType
     }));
 }
