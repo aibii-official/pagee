@@ -279,19 +279,19 @@ export function OptionsApp() {
               <option value="learning">Learning</option>
             </select>
           </div>
-          <div className="field">
-            <label>Default mode</label>
-            <select
-              value={settings.summaryPreferences.defaultMode}
-              onChange={(event) => setSettings(updatePreferences(settings, { defaultMode: event.target.value as SummaryPreferences['defaultMode'] }))}
-            >
-              <option value="short">Short</option>
-              <option value="medium">Standard</option>
-              <option value="long">Deep</option>
-              <option value="study">Study</option>
-              <option value="research">Research</option>
-            </select>
-          </div>
+            <div className="field">
+              <label>{t(language, 'summaryMode')}</label>
+              <select
+                value={settings.summaryPreferences.defaultMode}
+                onChange={(event) => setSettings(updatePreferences(settings, { defaultMode: event.target.value as SummaryPreferences['defaultMode'] }))}
+              >
+                <option value="short">{t(language, 'modeShort')}</option>
+                <option value="medium">{t(language, 'modeMedium')}</option>
+                <option value="long">{t(language, 'modeLong')}</option>
+                <option value="study">{t(language, 'modeStudy')}</option>
+                <option value="research">{t(language, 'modeResearch')}</option>
+              </select>
+            </div>
         </div>
       </section>
 

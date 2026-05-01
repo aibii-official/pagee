@@ -56,7 +56,12 @@ type MessageKey =
   | 'summarizePdf'
   | 'summarizing'
   | 'tldr'
-  | 'workspace';
+  | 'workspace'
+  | 'modeShort'
+  | 'modeMedium'
+  | 'modeLong'
+  | 'modeStudy'
+  | 'modeResearch';
 
 const messages: Record<UiLanguage, Record<MessageKey, string>> = {
   en: {
@@ -115,7 +120,12 @@ const messages: Record<UiLanguage, Record<MessageKey, string>> = {
     summarizePdf: 'Summarize PDF',
     summarizing: 'Summarizing...',
     tldr: 'TLDR',
-    workspace: 'Workspace'
+    workspace: 'Workspace',
+    modeShort: 'Brief',
+    modeMedium: 'Standard',
+    modeLong: 'Deep',
+    modeStudy: 'Study',
+    modeResearch: 'Research'
   },
   zh: {
     actionItems: '行动项',
@@ -173,7 +183,12 @@ const messages: Record<UiLanguage, Record<MessageKey, string>> = {
     summarizePdf: '摘要 PDF',
     summarizing: '摘要中...',
     tldr: '一句话总结',
-    workspace: '工作区'
+    workspace: '工作区',
+    modeShort: '简要概述',
+    modeMedium: '标准摘要',
+    modeLong: '深度分析',
+    modeStudy: '学习模式',
+    modeResearch: '研究模式'
   }
 };
 

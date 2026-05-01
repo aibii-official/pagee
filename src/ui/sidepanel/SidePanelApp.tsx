@@ -9,13 +9,15 @@ import { t } from '../i18n';
 import { type ActiveTabTarget, getActiveTabTarget, getActiveTabTargetForWindow, getLiveTabTarget, targetFromTab } from '../tab-target';
 import { formatDate } from '../utils';
 
-const MODES: Array<{ id: SummaryMode; label: string }> = [
-  { id: 'short', label: 'Short' },
-  { id: 'medium', label: 'Standard' },
-  { id: 'long', label: 'Deep' },
-  { id: 'study', label: 'Study' },
-  { id: 'research', label: 'Research' }
-];
+function getModes(language: UiLanguage): Array<{ id: SummaryMode; label: string; description: string }> {
+  return [
+    { id: 'short', label: t(language, 'modeShort'), description: t(language, 'modeShort') + ' - ' + t(language, 'shorter') },
+    { id: 'medium', label: t(language, 'modeMedium'), description: t(language, 'modeMedium') + ' - ' + t(language, 'detailedSummary') },
+    { id: 'long', label: t(language, 'modeLong'), description: t(language, 'modeLong') + ' - ' + t(language, 'moreDetailed') },
+    { id: 'study', label: t(language, 'modeStudy'), description: t(language, 'modeStudy') + ' - ' + t(language, 'moreTechnical') },
+    { id: 'research', label: t(language, 'modeResearch'), description: t(language, 'modeResearch') + ' - ' + t(language, 'simpler') }
+  ];
+}
 
 interface PendingSummaryTask {
   id: string;
@@ -574,10 +576,15 @@ export function SidePanelApp() {
         <div className="field">
           <label htmlFor="mode">{t(language, 'summaryMode')}</label>
           <select id="mode" value={mode} onChange={(event) => setMode(event.target.value as SummaryMode)}>
-            {MODES.map((item) => (
-              <option key={item.id} value={item.id}>{item.label}</option>
+            {getModes(language).map((item) => (
+              <option key={item.id} value={item.id} title={item.description}>
+                {item.label}
+              </option>
             ))}
           </select>
+          <p className="muted" style={{ marginTop: '4px' }}>
+            {getModes(language).find((m) => m.id === mode)?.description}
+          </p>
         </div>
         <div className="row wrap">
           {currentPageIsPdf ? (
@@ -609,7 +616,7 @@ export function SidePanelApp() {
           {currentPagePendingTasks.map((pendingTask) => (
             <div className="list-item compact" key={pendingTask.id}>
               <p>{pendingTask.title || pendingTask.url || 'Summarizing page'}</p>
-              <p className="muted">Mode: {pendingTask.mode} · {pendingTask.providerName ?? 'Provider'} · {pendingTask.model || 'model'}</p>
+              <p className="muted">Mode: {getModes(language).find((m) => m.id === pendingTask.mode)?.label || pendingTask.mode} · {pendingTask.providerName ?? 'Provider'} · {pendingTask.model || 'model'}</p>
               <p className="muted">Started {formatDate(pendingTask.startedAt)}</p>
               {pendingTask.progress && (
                 <p className="muted">
@@ -631,7 +638,7 @@ export function SidePanelApp() {
           {backgroundPendingTasks.map((pendingTask) => (
             <div className="list-item compact" key={pendingTask.id}>
               <strong>{pendingTask.title || pendingTask.url || 'Summary running in background'}</strong>
-              <p className="muted">Mode: {pendingTask.mode} · {pendingTask.providerName ?? 'Provider'} · {pendingTask.model || 'model'}</p>
+              <p className="muted">Mode: {getModes(language).find((m) => m.id === pendingTask.mode)?.label || pendingTask.mode} · {pendingTask.providerName ?? 'Provider'} · {pendingTask.model || 'model'}</p>
               {pendingTask.progress && (
                 <p className="muted">
                   {pendingTask.progress.message}

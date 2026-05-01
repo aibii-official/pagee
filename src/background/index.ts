@@ -17,7 +17,7 @@ import type {
   SummaryTaskResult,
   UserSettings
 } from '../shared/types';
-import { isFilePdfUrl, isHttpPageUrl } from '../shared/url';
+import { isFilePdfUrl, isHttpPageUrl, normalizeUrlForLookup } from '../shared/url';
 import {
   clearLibrary,
   getLibraryEntryForUrl,
@@ -119,12 +119,17 @@ async function getFallbackRegularTab(windowId?: number): Promise<chrome.tabs.Tab
 
 async function getTargetTab(target: TabTarget = {}): Promise<chrome.tabs.Tab> {
   const explicitTab = await getTabById(target.tabId);
+  const targetUrl = target.url || explicitTab?.url;
+  const normalizedTargetUrl = normalizeUrlForLookup(targetUrl);
+
   if (explicitTab?.id && isHttpPageUrl(explicitTab.url)) {
     rememberRegularTab(explicitTab);
     return explicitTab;
   }
 
   if (isFilePdfUrl(explicitTab?.url ?? target.url)) {
+    // PDF files are handled by the side panel file picker or direct PDF extraction
+    // They don't go through the regular tab targeting flow
     throw new Error('This is a local PDF. Open the Pagee workspace and choose the PDF file to summarize it locally.');
   }
 
@@ -213,7 +218,13 @@ async function attachVisibleTabScreenshot(
   tab: chrome.tabs.Tab,
   provider: LLMProviderConfig
 ): Promise<ExtractedContent> {
-  if (!tab.windowId || content.contentType === 'selection' || content.contentType === 'pdf' || !shouldAttemptVisionForProvider(provider, provider.chatModel)) {
+  if (!tab.windowId || content.contentType === 'selection' || content.contentType === 'pdf') {
+    return content;
+  }
+
+  // Only capture screenshot if the model explicitly supports vision
+  // This avoids sending images to text-only models and relying on error fallback
+  if (!shouldAttemptVisionForProvider(provider, provider.chatModel)) {
     return content;
   }
 
@@ -292,8 +303,9 @@ async function summarizeActiveTab(
 }
 
 async function getCurrentPageMemory(target: TabTarget = {}) {
-  if (isHttpPageUrl(target.url) || isFilePdfUrl(target.url)) {
-    return getLibraryEntryForUrl(target.url as string);
+  const targetUrl = target.url;
+  if (isHttpPageUrl(targetUrl) || isFilePdfUrl(targetUrl)) {
+    return getLibraryEntryForUrl(targetUrl as string);
   }
 
   const tab = await getTabById(target.tabId);

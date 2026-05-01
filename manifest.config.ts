@@ -6,6 +6,12 @@ export default defineManifest({
   short_name: 'Pagee',
   version: '0.1.0',
   description: 'A pure frontend Chrome extension for page summaries, local memory, and personal knowledge search.',
+  icons: {
+    '16': 'src/icons/icon16.png',
+    '32': 'src/icons/icon32.png',
+    '48': 'src/icons/icon48.png',
+    '128': 'src/icons/icon128.png'
+  },
   permissions: ['activeTab', 'contextMenus', 'sidePanel', 'scripting', 'storage', 'tabs', 'webNavigation'],
   optional_host_permissions: [
     'https://api.openai.com/*',

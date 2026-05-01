@@ -57,21 +57,7 @@ async function summarizeSingleContent(
     messages: buildSummaryMessages(content, mode, preferences, feedback, { includeMedia }),
     parameters: resolveGenerationParameters(provider, mode)
   }).catch(async (error) => {
-    if (includeMedia && isImageFormatError(error)) {
-      await progress?.({ stage: progressStage, message: `${progressMessage}; provider rejected one image, retrying with image metadata only`, current: progressCurrent, total: progressTotal });
-      return callProviderRaw({
-        provider,
-        messages: buildSummaryMessages(
-          content,
-          mode,
-          preferences,
-          [...feedback, '模型服务拒绝了至少一个图片输入。请基于文本、图片 URL、图片描述和其余元数据生成摘要；明确哪些视觉细节无法直接确认。'],
-          { includeMedia: false }
-        ),
-        parameters: resolveGenerationParameters(provider, mode)
-      });
-    }
-
+    // Only retry on token limit or JSON parsing errors
     if (!shouldRetrySummaryFailure(error)) {
       throw error;
     }
